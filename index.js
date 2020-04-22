@@ -2,13 +2,13 @@ const express = require('express');
 const app     = express();
 const path    = require('path');
 const createDAO   = require('./Models/dao');
-const ThreadsModel = require('./Models/ThreadsModel');
 const UserModel   = require('./Models/UserModel');
+const ThreadsModel   = require('./Models/ThreadsModel');
 const AuthController = require('./Controllers/AuthController');
 
 const dbFilePath = process.env.DB_FILE_PATH || path.join(__dirname, 'Database', 'Threads.db');
-let Thread = undefined;
 let Auth = undefined;
+let Threads = undefined;
 
 // Gives direct access to GET files from the
 // "public" directory (you can name the directory anything)
@@ -61,8 +61,9 @@ app.post("/login", async (req, res) => {
     }
     const {username, password} = body;
     try {
-        if( await Auth.login(username, password))
+        if( await Auth.login(username, password)) {
             res.sendStatus(200);
+        }
         else
             res.sendStatus(401);
     } catch (err) {
@@ -70,6 +71,43 @@ app.post("/login", async (req, res) => {
         res.sendStatus(500);
     }
 });
+
+app.get("/threadsHome", async (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "html", "threadsHome.html"));
+});
+
+app.get("/createThread", async (req, res) => {
+    res.sendFile(path.join(__dirname, "public", "html", "threadsCreation.html"));
+});
+
+app.post("/createThread", async (req, res) => {
+    const body = req.body;
+    console.log(body);
+    if (body === undefined) {
+        return res.sendStatus(400);
+    }
+    Threads.add(body.title, body.content)
+        .then( () => {
+            res.sendStatus(200);
+        }).catch( err => {
+            console.error(err);
+            res.sendStatus(500);
+        });
+});
+
+app.get("/thread_items", (req, res) => {
+    Threads.getAll()
+        .then( (rows) => {
+            console.log(rows);
+            // remember to change index.js
+            res.send(JSON.stringify({thread_items: rows}));
+        })
+        .catch( err => {
+            console.error(err);
+            res.sendStatus(500);
+        })
+});
+
 
 // Listen on port 80 (Default HTTP port)
 app.listen(80, async () => {
@@ -81,8 +119,8 @@ app.listen(80, async () => {
 
 async function initDB () {
     const dao = await createDAO(dbFilePath);
-    Thread = new ThreadsModel(dao);
-    await Thread.createTable();
+    Threads = new ThreadsModel(dao);
+    await Threads.createTable();
     Users = new UserModel(dao);
     await Users.createTable();
     Auth = new AuthController(dao);
